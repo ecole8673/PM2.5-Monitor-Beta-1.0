@@ -1,0 +1,117 @@
+#include <SPI.h>
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+#include <Adafruit_Sensor.h>
+#include <DHT.h>
+#include <DHT_U.h>
+
+// OLED Display Definitions
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+#define OLED_RESET -1
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+
+// DHT Sensor Definitions
+#define DHT_PIN 2
+#define DHT_TYPE DHT11
+DHT dht(DHT_PIN, DHT_TYPE);
+
+// Gas Sensor Pin
+#define GAS_SENSOR_PIN A0
+
+// PMS7003 Serial Pins
+#define PMS_RX_PIN 10
+#define PMS_TX_PIN 11
+
+// Global Variables
+int gasLevel = 0;
+String airQuality = "";
+
+// Function to display text on OLED
+void displayText(int x, int y, String text, int textSize = 1) {
+  display.setCursor(x, y);
+  display.setTextSize(textSize);
+  display.println(text);
+}
+
+// Function to read DHT11 sensor
+void readDHT11() {
+  float humidity = dht.readHumidity();
+  float temperature = dht.readTemperature();
+
+
+  if (isnan(humidity) || isnan(temperature)) {
+    Serial.println("Failed to read from DHT11 sensor!");
+    displayText(0, 43, "DHT11 Error!");
+    return;
+  }
+
+
+  displayText(0, 43, "Temp : " + String(temperature) + " C");
+  displayText(0, 56, "RH   : " + String(humidity) + Fr" %");
+}
+
+
+// Function to read MQ135 gas sensor
+void readGasSensor() {
+  gasLevel = analogRead(GAS_SENSOR_PIN);
+
+// Function to read PMS7003 sensor
+void readPMS7003() {
+  Serial.begin(9600); // PMS7003 uses Serial communication
+  if (Serial.available() >= 32) {
+    uint8_t buffer[32];
+    Serial.readBytes(buffer, 32);
+
+
+    if (buffer[0] == 0x42 && buffer[1] == 0x4D) {
+      int pm25 = buffer[12] << 8 | buffer[13];
+      displayText(0, 45, "PM2.5: " + String(pm25) + " ug/m3");
+    }
+  }
+}
+
+// Setup Function
+void setup() {
+  Serial.begin(9600);
+  pinMode(GAS_SENSOR_PIN, INPUT);
+
+
+  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+    Serial.println(F("SSD1306 allocation failed"));
+    while (true);
+  }
+
+
+  dht.begin();
+
+
+  display.clearDisplay();
+  display.setTextColor(WHITE);
+
+ // Startup Display
+  displayText(30, 10, "AQI Monitor", 2);
+  displayText(10, 40, "Initializing...", 1);
+  display.display();
+  delay(2000);
+  display.clearDisplay();
+}
+
+
+// Main Loop
+void loop() {
+  display.clearDisplay();
+
+
+  readGasSensor();
+  readDHT11();
+  readPMS7003();
+
+
+  display.display();
+  delay(2000); // Adjust for sensor reading intervals
+}
+
+
+
